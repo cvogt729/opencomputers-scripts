@@ -3,6 +3,8 @@
 local generatorThreshold = 0.5
 -- when energy < this, recharge at home
 local rechargeThreshold = 0.08
+-- when energy > this, considered to have full charge
+local maxChargeThreshold = 0.98
 -- items which may be burned for energy in the generator
 local fuelSources = {
   "Coal",
@@ -104,6 +106,11 @@ local geo = component.getPrimary("geolyzer")
 -- Dirt,Gravel = 0.6
 -- Air,Oil = 0
 
+local i,j,k
+local function println(s)
+  term.write(s.."\n")
+end
+
 -- print correct usage when invalid arguments are given
 local function printUsage()
   local name = debug.getinfo(2,"S").short_src:match("[^/]+.lua$")
@@ -112,29 +119,29 @@ local function printUsage()
   else
     name = "Mine"
   end
-  term.write("Usage:\n")
-  term.write(name.." <radius> <homeY> <minY> <maxY>\n")
-  term.write(name.." 40 60 8 35\n")
-  term.write("radius: Max lateral distance from x,z origin\n")
-  term.write("homeY: Absolute y coord of origin\n")
-  term.write("minY: Lower bound for mining depth\n")
-  term.write("maxY: Upper bound for mining depth\n")
+  println("Usage:")
+  println(name.." <radius> <maxY>")
+  println(name.." 40 30")
+  println("radius: Max lateral distance from x,z origin")
+  println("maxY: Upper bound for mining depth")
   os.exit()
 end
 local args = {...}
-if #args~=4 then
+if #args~=2 then
   if #args>0 then
-    term.write("Incorrect number of arguments.")
+    println("Incorrect number of arguments.")
   end
   printUsage()
 end
 local radius = tonumber(args[1])
-local homeY = tonumber(args[2])
-local minY = tonumber(args[3])
-local maxY = tonumber(args[4])
-if radius==nil or homeY==nil or minY==nil or maxY==nil then
-  term.write("Failed to convert arguments to numbers.")
+local maxY = tonumber(args[2])
+if radius==nil or maxY==nil then
+  println("Failed to convert arguments to numbers.")
   printUsage()
+end
+-- returns the energy level of this robot
+local function getEnergy()
+  return computer.energy()/computer.maxEnergy()
 end
 local function arrayToSet(arr)
   for i=#arr,1,-1 do
@@ -167,7 +174,11 @@ local function dropValuables(keepFuel)
       if key and valuables[key] then
         if not keepFuel or hasFuel or not fuelSources[key] then
           select(i)
-          robot.drop()
+          if not robot.drop() then
+            println("Valuables inventory is full.")
+            robot.turnRight()
+            os.exit()
+          end
         else
           hasFuel = true
         end
@@ -183,7 +194,9 @@ local function dropTrash()
       key = inv.getStackInInternalSlot(i).label:match("%w+$")
       if key and not valuables[key] then
         select(i)
-        robot.drop()
+        if not robot.drop() then
+          robot.dropUp()
+        end
       end
     end
   end
@@ -224,12 +237,53 @@ local function removeFuel()
   end
   return false
 end
+-- Empties inventory, charges robot, and charges tool
+local function chargeAndDrop()
+  if geo.analyze(sides.front).name~="OpenComputers:charger" then
+    println("Please place an OpenComputers charger in front of the robot.")
+    os.exit()
+  end
+  robot.up()
+  if geo.analyze(sides.front).name~="Mekanism:EnergyCube" then
+    println("Please place a Mekanism energy cube above the charger.")
+    robot.down()
+    os.exit()
+  end
+  i=0
+  while robot.durability()<maxChargeThreshold do
+    i = i+1
+    if i==36 then
+      println("Energy cube appears to have run out of power.")
+      os.exit()
+    end
+    inv.equip()
+    inv.dropIntoSlot(sides.front,1)
+    os.sleep(5)
+    inv.suckFromSlot(sides.front,1)
+    inv.equip()
+  end
+  robot.down()
+  robot.turnRight()
+  dropTrash()
+  removeFuel()
+  robot.turnAround()
+  dropValuables(true)
+  robot.turnRight()
+  i=0
+  while robot.getEnergy()<maxChargeThreshold do
+    i = i+1
+    if i==60 then
+      println("Energy cube appears to have run out of power.")
+      os.exit()
+    end
+    os.sleep(5)
+  end
+end
 
 
--- check for chests placed on any side of turtle
--- drop valuables into chests
--- drop trash into chests
--- wait for energy to be > 0.98
+
+
+chargeAndDrop()
 -- go to maxY
 -- go to a top corner of the mining region
 -- process everything in 4x4x4 chunks with geolyzer
