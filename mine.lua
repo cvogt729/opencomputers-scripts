@@ -104,10 +104,9 @@ local geo = component.getPrimary("geolyzer")
 -- Dirt,Gravel = 0.6
 -- Air,Oil = 0
 
-
 -- print correct usage when invalid arguments are given
 local function printUsage()
-  local name = debug.getinfo(1,"S").source:match("[^/]+.lua")
+  local name = debug.getinfo(2,"S").short_src:match("[^/]+.lua$")
   if name then
     name = name:sub(0,-5)
   else
