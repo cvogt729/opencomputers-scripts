@@ -1,10 +1,7 @@
 
--- when energy < this, fuel the generator
-local generatorThreshold = 0.7
--- when energy < this, recharge at home
-local rechargeThreshold = 0.15
--- when energy > this, considered to have full charge
-local maxChargeThreshold = 0.98
+-- Mining Program v0.1.0
+local debugMode = true
+
 -- items which may be burned for energy in the generator
 local fuelSources = {
   "Coal",
@@ -30,6 +27,10 @@ local valuables = {
   "Ore",
   "Dust",
   "Obsidian"
+}
+-- used to fly when robot.up() returns "impossible move"
+local placementBlocks = {
+  "Cobblestone"
 }
 
 --os.sleep(seconds: number)
@@ -127,17 +128,23 @@ local function printUsage()
   os.exit()
 end
 local args = {...}
-if #args~=2 then
-  if #args>0 then
-    println("Incorrect number of arguments.")
+local radius, maxY
+if debugMode then
+  radius = 10
+  maxY = 20
+else
+  if #args~=2 then
+    if #args>0 then
+      println("Incorrect number of arguments.")
+    end
+    printUsage()
   end
-  printUsage()
-end
-local radius = tonumber(args[1])
-local maxY = tonumber(args[2])
-if radius==nil or maxY==nil then
-  println("Failed to convert arguments to numbers.")
-  printUsage()
+  radius = tonumber(args[1])
+  maxY = tonumber(args[2])
+  if radius==nil or maxY==nil then
+    println("Failed to convert arguments to numbers.")
+    printUsage()
+  end
 end
 -- returns the energy level of this robot
 local function getEnergy()
@@ -150,6 +157,7 @@ local function arrayToSet(arr)
 end
 arrayToSet(fuelSources)
 arrayToSet(valuables)
+arrayToSet(placementBlocks)
 local invSize = robot.inventorySize()
 local selectedSlot = robot.select(1)
 -- safe slot selection function when looping
@@ -187,16 +195,34 @@ local function dropValuables(keepFuel)
   end
 end
 -- drops all trash in front of the robot
-local function dropTrash()
+-- retains at most one slot for blocks when keepBlock is true
+local function dropTrash(keepBlock)
   local key
+  local hasBlock = false
   for i=1,invSize,1 do
     if robot.count(i)>0 then
       key = inv.getStackInInternalSlot(i).label:match("%w+$")
       if key and not valuables[key] then
-        select(i)
-        if not robot.drop() then
-          robot.dropUp()
+        if not keepBlock or hasBlock or not placementBlocks[key] then
+          select(i)
+          if not robot.drop() then
+            robot.dropUp()
+          end
+        else
+          hasBlock = true
         end
+      end
+    end
+  end
+end
+-- places a block in front of the robot
+local function placeBlock()
+  local key
+  for i=1,invSize,1 do
+    if robot.count(i)>0 then
+      key = inv.getStackInInternalSlot(i).label:match("%w+$")
+      if key and placementBlocks[key] and robot.place() then
+        break
       end
     end
   end
@@ -204,6 +230,9 @@ end
 -- attempts to load the generator with fuel
 -- returns boolean value indicating success
 local function refuel()
+  if generator.count()>0 then
+    return true
+  end
   local key
   for i=1,invSize,1 do
     if robot.count(i)>0 then
@@ -237,15 +266,20 @@ local function removeFuel()
   end
   return false
 end
-local x,y,z = 0,0,0
+local x,y,z,w = 0,0,0,0
+local homeY = 0
 local function up()
+  local s,t
   for i=1,60,1 do
     if geo.detect(sides.up) then
       robot.swingUp()
     end
-    if robot.up() then
+    s,t = robot.up()
+    if s then
       y = y+1
       return true
+    elseif t=="impossible move" then
+      placeBlock()
     end
     os.sleep(0.5)
   end
@@ -288,14 +322,77 @@ end
 local function turnRight()
   robot.turnRight()
   x,z = z,-x
+  w = (w+1)%4
 end
 local function turnLeft()
   robot.turnLeft()
   x,z = -z,x
+  w = (w+3)%4
 end
 local function turnAround()
   robot.turnAround()
   x,z = -x,-z
+  w = (w+2)%4
+end
+local function setFace(ww)
+  if ww and w~=ww then
+    if (w+3)%4==ww then
+      turnLeft()
+    elseif (w+1)%4==ww then
+      turnRight()
+    else
+      turnAround()
+    end
+  end
+end
+local function transformXZ(xx, zz, ww)
+  if ww==w then
+    return xx,zz
+  elseif (ww+1)%4==w then
+    return zz,-xx
+  elseif (ww+2)%4==w then
+    return -xx,-zz
+  elseif (ww+3)%4==w then
+    return -zz,xx
+  end
+end
+local homeCheckIndex = 0
+local function needsHome()
+  homeCheckIndex = homeCheckIndex+1
+  if homeCheckIndex>=5 then
+    homeCheckIndex = 0
+    local e = getEnergy()
+    if e>0.98 then
+      removeFuel()
+    elseif e<0.9 then
+      refuel()
+      if e<0.2 then
+        while true do
+          os.sleep(10)
+          if getEnergy()>0.32 or not refuel() then
+            break
+          end
+        end
+      end
+      if e<0.25 then
+        return true
+      end
+    end
+    if robot.durability()<0.98 then
+      return true
+    end
+    local count = 0
+    for i=1,invSize,1 do
+      if robot.count(i)==0 then
+        count = count+1
+        if count>=4 then
+          break
+        end
+      end
+    end
+    return count<4
+  end
+  return false
 end
 -- Empties inventory, charges robot, and charges tool
 local function chargeAndDrop()
@@ -310,7 +407,7 @@ local function chargeAndDrop()
     os.exit()
   end
   i=0
-  while robot.durability()<maxChargeThreshold do
+  while robot.durability()<0.98 do
     i = i+1
     if i==36 then
       println("Energy cube appears to have run out of power.")
@@ -330,7 +427,7 @@ local function chargeAndDrop()
   dropValuables(true)
   robot.turnRight()
   i=0
-  while getEnergy()<maxChargeThreshold do
+  while getEnergy()<0.98 do
     i = i+1
     if i==60 then
       println("Energy cube appears to have run out of power.")
@@ -339,20 +436,181 @@ local function chargeAndDrop()
     os.sleep(5)
   end
 end
+local function goXZ(xd,zd)
+  while zd>0 do
+    forward()
+    zd = zd-1
+  end
+  while zd<0 and back() do
+    zd = zd+1
+  end
+  local flag = 0
+  if xd>0 then
+    turnLeft()
+    flag = 1
+  elseif xd<0 then
+    turnRight()
+    xd = -xd
+    flag = -1
+  end
+  while xd>0 do
+    forward()
+    xd = xd-1
+  end
+  if zd<0 then
+    if flag==1 then
+      turnLeft()
+    elseif flag==-1 then
+      turnRight()
+    else
+      turnAround()
+    end
+    while zd<0 do
+      forward()
+      zd = zd+1
+    end
+  end
+end
+local function go(xx,yy,zz,ww,ignoreCheck)
+  if not ignoreCheck and needsHome() then
+    local www = w
+    go(0,homeY,0,0,true)
+    chargeAndDrop()
+    local yd = yy-y
+    while yd>0 do
+      up()
+      yd = yd-1
+    end
+    while yd<0 do
+      down()
+      yd = yd+1
+    end
+    xx,zz = transformXZ(xx,zz,www)
+    goXZ(xx-x,zz-z)
+    setFace(ww)
+  else
+    goXZ(xx-x,zz-z)
+    setFace(ww)
+    local yd = yy-y
+    while yd>0 do
+      up()
+      yd = yd-1
+    end
+    while yd<0 do
+      down()
+      yd = yd+1
+    end
+  end
+end
+local function kill(xx,yy,zz)
+  if needsHome() then
+    local ww = w
+    go(0,homeY,0,0,true)
+    chargeAndDrop()
+    local yd = yy-y
+    while yd>0 do
+      up()
+      yd = yd-1
+    end
+    while yd<0 do
+      down()
+      yd = yd+1
+    end
+    xx,zz = transformXZ(xx,zz,ww)
+  end
+  if y==yy then
+    local zd = zz-z
+    if xx==x then
+      if zz~=z then
+        if zd<0 then
+          zd = -zd
+          turnAround()
+        end
+        while zd>1 do
+          forward()
+          zd = zd-1
+        end
+        robot.swing()
+      end
+    elseif zd>=0 then
+      while zd>0 do
+        forward()
+        zd = zd-1
+      end
+      local xd = xx-x
+      if xd>0 then
+        turnLeft()
+      else
+        turnRight()
+        xd = -xd
+      end
+      while xd>1 do
+        forward()
+        xd = xd-1
+      end
+      robot.swing()
+    else
+      local flag = false
+      local xd = xx-x
+      if xd>0 then
+        turnLeft()
+        flag = true
+      else
+        turnRight()
+        xd = -xd
+      end
+      while xd>0 do
+        forward()
+        xd = xd-1
+      end
+      if flag then
+        turnLeft()
+      else
+        turnRight()
+      end
+      while zd<1 do
+        forward()
+        zd = zd+1
+      end
+      robot.swing()
+    end
+  else
+    goXZ(xx-x,zz-z)
+    local yd = yy-y
+    if yd>0 then
+      while yd>1 do
+        up()
+        yd = yd-1
+      end
+      robot.swingUp()
+    else
+      while yd<-1 do
+        down()
+        yd = yd+1
+      end
+      robot.swingDown()
+    end
+  end
+end
+
 chargeAndDrop()
-local homeY = 1
+homeY = 1
+z = 0
 while true do
   if geo.detect(sides.down) then
     robot.swingDown()
   end
-  if robot.down() then
+  x,y = robot.down()
+  if x then
     homeY = homeY+1
-  else
+  elseif y and y=="solid" or z==10 then
     break
+  else
+    z = z+1
+    os.sleep(0.5)
   end
 end
 x,y,z = 0,1,0
-while y<homeY do
-  up()
-end
+
+go(0,homeY,0,0,true)
 chargeAndDrop()
