@@ -1,8 +1,8 @@
 
 -- when energy < this, fuel the generator
-local generatorThreshold = 0.5
+local generatorThreshold = 0.7
 -- when energy < this, recharge at home
-local rechargeThreshold = 0.08
+local rechargeThreshold = 0.15
 -- when energy > this, considered to have full charge
 local maxChargeThreshold = 0.98
 -- items which may be burned for energy in the generator
@@ -237,16 +237,76 @@ local function removeFuel()
   end
   return false
 end
+local x,y,z = 0,0,0
+local function up()
+  for i=1,60,1 do
+    if geo.detect(sides.up) then
+      robot.swingUp()
+    end
+    if robot.up() then
+      y = y+1
+      return true
+    end
+    os.sleep(0.5)
+  end
+  return false
+end
+local function down()
+  for i=1,60,1 do
+    if geo.detect(sides.down) then
+      robot.swingDown()
+    end
+    if robot.down() then
+      y = y-1
+      return true
+    end
+    os.sleep(0.5)
+  end
+  return false
+end
+local function forward()
+  for i=1,120,1 do
+    if geo.detect(sides.front) then
+      robot.swing()
+    end
+    if robot.forward() then
+      z = z+1
+      return true
+    end
+    os.sleep(0.5)
+  end
+  return false
+end
+local function back()
+  if robot.back() then
+    z = z-1
+    return true
+  else
+    return false
+  end
+end
+local function turnRight()
+  robot.turnRight()
+  x,z = z,-x
+end
+local function turnLeft()
+  robot.turnLeft()
+  x,z = -z,x
+end
+local function turnAround()
+  robot.turnAround()
+  x,z = -x,-z
+end
 -- Empties inventory, charges robot, and charges tool
 local function chargeAndDrop()
   if geo.analyze(sides.front).name~="OpenComputers:charger" then
     println("Please place an OpenComputers charger in front of the robot.")
     os.exit()
   end
-  robot.up()
+  up()
   if geo.analyze(sides.front).name~="Mekanism:EnergyCube" then
     println("Please place a Mekanism energy cube above the charger.")
-    robot.down()
+    down()
     os.exit()
   end
   i=0
@@ -262,7 +322,7 @@ local function chargeAndDrop()
     inv.suckFromSlot(sides.front,1)
     inv.equip()
   end
-  robot.down()
+  down()
   robot.turnRight()
   dropTrash()
   removeFuel()
@@ -291,13 +351,8 @@ while true do
     break
   end
 end
-
-for i=2,homeY,1 do
-  robot.up()
+x,y,z = 0,1,0
+while y<homeY do
+  up()
 end
-
--- go to maxY
--- go to a top corner of the mining region
--- process everything in 4x4x4 chunks with geolyzer
--- check energy level, inv space, and tool durability after each chunk
--- if low energy or less than 4 free slots, recharge and dump
+chargeAndDrop()
