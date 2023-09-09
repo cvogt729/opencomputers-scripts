@@ -270,7 +270,7 @@ local function chargeAndDrop()
   dropValuables(true)
   robot.turnRight()
   i=0
-  while robot.getEnergy()<maxChargeThreshold do
+  while getEnergy()<maxChargeThreshold do
     i = i+1
     if i==60 then
       println("Energy cube appears to have run out of power.")
@@ -279,11 +279,19 @@ local function chargeAndDrop()
     os.sleep(5)
   end
 end
-
-
-
-
 chargeAndDrop()
+local homeY = 0
+while true do
+  if geo.detect(sides.down) then
+    robot.swingDown()
+  end
+  if robot.down() then
+    homeY = homeY+1
+  else
+    break
+  end
+end
+
 -- go to maxY
 -- go to a top corner of the mining region
 -- process everything in 4x4x4 chunks with geolyzer
