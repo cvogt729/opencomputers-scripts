@@ -280,7 +280,7 @@ local function chargeAndDrop()
   end
 end
 chargeAndDrop()
-local homeY = 0
+local homeY = 1
 while true do
   if geo.detect(sides.down) then
     robot.swingDown()
@@ -290,6 +290,10 @@ while true do
   else
     break
   end
+end
+
+for i=2,homeY,1 do
+  robot.up()
 end
 
 -- go to maxY
