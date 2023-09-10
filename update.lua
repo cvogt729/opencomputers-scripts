@@ -26,11 +26,15 @@ local files = {
   "right.lua",
   "left.lua",
   "refuel.lua",
-  "unfuel.lua"
+  "unfuel.lua",
+  "select.lua",
+  "place.lua",
+  "placeDown.lua",
+  "placeUp.lua"
 }
 local blacklist = {}
 local x
-for i=#files,1,-1 do
+for i=1,#files,1 do
   path = dir..files[i]
   if fs.exists(path) then
     x = " * "
@@ -42,7 +46,7 @@ for i=#files,1,-1 do
   end
   term.write(x..files[i].."\n")
 end
-for i=#blacklist,1,-1 do
+for i=1,#blacklist,1 do
   path = dir..blacklist[i]
   if fs.exists(path) then
     if fs.remove(path) then
