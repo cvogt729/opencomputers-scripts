@@ -1,7 +1,29 @@
 
--- Mining Program v0.1.0
-local debugMode = true
+-- Mining Program
+local version = "v0.1.0"
 
+-- Requirements:
+--   Upgrade: Geolyzer
+--   Upgrade: Inventory Controller
+--   Upgrade: Generator
+--   Upgrade: Angel
+--   Equipped Tool: Atomic Disassembler
+--   Inventories on both left and right sides of robot
+--   Empty space behind robot
+--   OpenComputers charger in front of robot
+--   Mekanism energy cube on top of charger
+--   Some fuel in robot inventory for generator
+--   Some placement blocks in robot inventory (e.g, cobblestone)
+
+-- Valuables will be dumped into the left inventory
+-- Trash will be dumped into the right inventory
+-- If no right inventory, trash will be dumped on the groud
+-- Any energized mining tool may be used in place of the atomic disassembler
+
+-- placed when robot movement returns "impossible move"
+local placementBlocks = {
+  "Cobblestone"
+}
 -- items which may be burned for energy in the generator
 local fuelSources = {
   "Coal",
@@ -27,10 +49,6 @@ local valuables = {
   "Ore",
   "Dust",
   "Obsidian"
-}
--- used to fly when robot.up() returns "impossible move"
-local placementBlocks = {
-  "Cobblestone"
 }
 
 --os.sleep(seconds: number)
@@ -94,10 +112,6 @@ local geo = component.getPrimary("geolyzer")
 --geo.analyze(side:number):table
 --geo.scan(x:number, z:number[, y:number, w:number, d:number, h:number][, ignoreReplaceable:boolean|options:table]):table
 
--- positive x axis is to left of robot
--- positive z axis is to front of robot
--- positive y axis is above robot
-
 -- Hardness of various blocks:
 -- Water,Lava = 100
 -- Obsidian = 50
@@ -109,7 +123,11 @@ local geo = component.getPrimary("geolyzer")
 
 local i,j,k
 local function println(s)
-  term.write(s.."\n")
+  if s then
+    term.write(s.."\n")
+  else
+    term.write("\n")
+  end
 end
 
 -- print correct usage when invalid arguments are given
@@ -118,34 +136,31 @@ local function printUsage()
   if name then
     name = name:sub(0,-5)
   else
-    name = "Mine"
+    name = "mine"
   end
   println("Usage:")
-  println(name.." <radius> <maxY>")
-  println(name.." 40 30")
-  println("radius: Max lateral distance from x,z origin")
+  println(name.." <maxY>")
   println("maxY: Upper bound for mining depth")
   os.exit()
 end
 local args = {...}
-local radius, maxY
-if debugMode then
-  radius = 10
-  maxY = 20
-else
-  if #args~=2 then
-    if #args>0 then
-      println("Incorrect number of arguments.")
-    end
-    printUsage()
-  end
-  radius = tonumber(args[1])
-  maxY = tonumber(args[2])
-  if radius==nil or maxY==nil then
-    println("Failed to convert arguments to numbers.")
-    printUsage()
-  end
+if #args==1 and (args[1]=="--version" or args[1]=="-v") then
+  println(version)
+  os.exit()
 end
+if #args~=1 then
+  if #args>0 then
+    println("Incorrect number of arguments.")
+  end
+  printUsage()
+end
+local maxY = tonumber(args[1])
+if maxY==nil then
+  println("Failed to convert argument to number.")
+  printUsage()
+end
+
+
 -- returns the energy level of this robot
 local function getEnergy()
   return computer.energy()/computer.maxEnergy()
@@ -170,6 +185,7 @@ local function select(slot)
   if slot~=selectedSlot then
     selectedSlot = robot.select(slot)
   end
+  return true
 end
 -- drops all valuable items in front of the robot
 -- retains at most one slot for fuel when keepFuel is true
@@ -221,11 +237,25 @@ local function placeBlock()
   for i=1,invSize,1 do
     if robot.count(i)>0 then
       key = inv.getStackInInternalSlot(i).label:match("%w+$")
-      if key and placementBlocks[key] and robot.place() then
-        break
+      if key and placementBlocks[key] and select(i) and robot.place() then
+        return true
       end
     end
   end
+  return false
+end
+-- places a block below the robot
+local function placeBlockDown()
+  local key
+  for i=1,invSize,1 do
+    if robot.count(i)>0 then
+      key = inv.getStackInInternalSlot(i).label:match("%w+$")
+      if key and placementBlocks[key] and select(i) and robot.placeDown() then
+        return true
+      end
+    end
+  end
+  return false
 end
 -- attempts to load the generator with fuel
 -- returns boolean value indicating success
@@ -266,6 +296,11 @@ local function removeFuel()
   end
   return false
 end
+-- positive x axis is to left of robot
+-- positive z axis is to front of robot
+-- positive y axis is above robot
+-- w represents relative facing side
+-- 0=initial, 1=turnRight(), 2=turnAround(), 3=turnLeft()
 local x,y,z,w = 0,0,0,0
 local homeY = 0
 local function up()
@@ -299,22 +334,35 @@ local function down()
   return false
 end
 local function forward()
+  local s,t
   for i=1,120,1 do
     if geo.detect(sides.front) then
       robot.swing()
     end
-    if robot.forward() then
+    s,t = robot.forward()
+    if s then
       z = z+1
       return true
+    elseif t=="impossible move" then
+      placeBlockDown()
     end
     os.sleep(0.5)
   end
   return false
 end
 local function back()
-  if robot.back() then
+  local s,t = robot.back()
+  if s then
     z = z-1
     return true
+  elseif t=="impossible move" then
+    placeBlockDown()
+    if robot.back() then
+      z = z-1
+      return true
+    else
+      return false
+    end
   else
     return false
   end
@@ -345,14 +393,17 @@ local function setFace(ww)
     end
   end
 end
-local function transformXZ(xx, zz, ww)
-  if ww==w then
+local function transformXZ(xx, zz, wOld, wNew)
+  if not wNew then
+    wNew = w
+  end
+  if wOld==wNew then
     return xx,zz
-  elseif (ww+1)%4==w then
+  elseif (wOld+1)%4==wNew then
     return zz,-xx
-  elseif (ww+2)%4==w then
+  elseif (wOld+2)%4==wNew then
     return -xx,-zz
-  elseif (ww+3)%4==w then
+  elseif (wOld+3)%4==wNew then
     return -zz,xx
   end
 end
@@ -421,7 +472,7 @@ local function chargeAndDrop()
   end
   down()
   robot.turnRight()
-  dropTrash()
+  dropTrash(true)
   removeFuel()
   robot.turnAround()
   dropValuables(true)
@@ -592,7 +643,25 @@ local function kill(xx,yy,zz)
     end
   end
 end
+local geoW = 0
+local function orientGeolyzer()
+  local t = geo.scan(-1,-1,0,3,3,1)
+  if t[2]==0 then
+    geoW = 0
+  elseif t[4]==0 then
+    geoW = 1
+  elseif t[6]==0 then
+    geoW = 3
+  elseif t[8]==0 then
+    geoW = 2
+  else
+    println("Unable to orient geolyzer.")
+    println("Please ensure the space behind the robot is empty.")
+    os.exit()
+  end
+end
 
+orientGeolyzer()
 chargeAndDrop()
 homeY = 1
 z = 0
@@ -603,6 +672,7 @@ while true do
   x,y = robot.down()
   if x then
     homeY = homeY+1
+    z = 0
   elseif y and y=="solid" or z==10 then
     break
   else
