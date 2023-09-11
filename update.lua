@@ -1,3 +1,6 @@
+
+-- Requires internet card upgrade
+
 local args = {...}
 local term = require("term")
 local sh = require("shell")
@@ -32,6 +35,17 @@ local files = {
   "placeDown.lua",
   "placeUp.lua"
 }
+--TODO
+--  tunnel <d>
+--    basically forward.lua with swingUp() added
+--    place block below when detectDown() is false
+--    use geolyzer scan to detect lava/water in bad spots
+--    when detected, have the robot place blocks to make it safe
+--  room <w> <d> <h>
+--    dig out a room with the given dimensions
+--  boundary <w> <d> <h>
+--    place floor, walls, and ceiling for a room of the given dimensions
+--    can also be used to replace walls with a specific block for uniformity
 local blacklist = {}
 local x
 for i=1,#files,1 do

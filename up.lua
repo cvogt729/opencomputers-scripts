@@ -21,19 +21,22 @@ local function printUsage()
   println("d: Number of spaces to move up")
   os.exit()
 end
-if #args~=1 then
-  if #args>0 then
+local d
+if #args==0 then
+  d = 1
+else
+  if #args~=1 then
     println("Incorrect number of arguments.")
+    printUsage()
   end
-  printUsage()
-end
-local d = tonumber(args[1])
-if d==nil then
-  println("Failed to convert argument to number.")
-  printUsage()
-elseif d<=0 then
-  println("Please provide a positive argument.")
-  printUsage()
+  d = tonumber(args[1])
+  if d==nil then
+    println("Failed to convert argument to number.")
+    printUsage()
+  elseif d<=0 then
+    println("Please provide a positive argument.")
+    printUsage()
+  end
 end
 local function arrayToSet(arr)
   for i=#arr,1,-1 do
@@ -90,4 +93,4 @@ local x = 0
 while x<d and up() do
   x = x+1
 end
-println("Moved up "..x.." blocks.")
+println("Moved up "..x.." block(s).")

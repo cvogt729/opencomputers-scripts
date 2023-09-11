@@ -413,14 +413,13 @@ local function needsHome()
   if homeCheckIndex>=5 then
     homeCheckIndex = 0
     local e = getEnergy()
-    if e>0.98 then
+    if e>0.95 then
       removeFuel()
-    elseif e<0.9 then
-      refuel()
-      if e<0.2 then
+    elseif e<0.85 then
+      if refuel() and e<0.2 then
         while true do
           os.sleep(10)
-          if getEnergy()>0.32 or not refuel() then
+          if getEnergy()>0.3 or not refuel() then
             break
           end
         end
@@ -429,7 +428,7 @@ local function needsHome()
         return true
       end
     end
-    if robot.durability()<0.98 then
+    if robot.durability()<0.2 then
       return true
     end
     local count = 0
@@ -660,6 +659,60 @@ local function orientGeolyzer()
     os.exit()
   end
 end
+local function scan()
+  local n = 10
+  local raw = {}
+  local gx,gz,gy -- relative scan anchor coords in geolyzer orientation
+  local gw,gd,gh -- width, height, and depth of geolyzer scan
+  gy = -1
+  gh = 3
+  if w==geoW then
+    gx,gz,gw,gd = -1,0,3,7
+  elseif (w+2)%4==geoW then
+    gx,gz,gw,gd = -1,-6,3,7
+  elseif (w+1)%4==geoW then
+    gx,gz,gw,gd = 0,-1,7,3
+  else
+    gx,gz,gw,gd = -6,-1,7,3
+  end
+  for i=1,63,1 do
+    raw[i] = 0
+  end
+  local _raw
+  for i=1,n,1 do
+    _raw = geo.scan(gx,gz,gy,gw,gd,gh)
+    for j=1,63,1 do
+      raw[j] = raw[j]+_raw[j]
+    end
+  end
+  _raw = nil
+  gw = gw-1
+  gd = gd-1
+  gh = gh-1
+  local ores = {}
+  local i = 0
+  local j = 0
+  for yy=0,gh,1 do
+    for zz=0,gd,1 do
+      for xx=0,gw,1 do
+        i = i+1
+        raw[i] = raw[i]/n
+        if raw[i]>2.4 and raw[i]<60 then
+          j = j+1
+          ores[j] = {
+            _x = gx+xx,
+            _z = gz+zz,
+            _y = gy+yy
+          }
+          ores[j]._x, ores[j]._z = transformXZ(ores[j]._x, ores[j]._z, geoW)
+        end
+      end
+    end
+  end
+  for i=1,j,1 do
+    println("("..ores[i]._x..", "..ores[i]._z..", "..ores[i]._y..")")
+  end
+end
 
 orientGeolyzer()
 chargeAndDrop()
@@ -681,6 +734,9 @@ while true do
   end
 end
 x,y,z = 0,1,0
+maxY = math.min(maxY, homeY-2)
+maxY = maxY-(maxY%3)
 
 go(0,homeY,0,0,true)
 chargeAndDrop()
+scan()

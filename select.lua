@@ -33,7 +33,7 @@ if slot==nil then
   printUsage()
 elseif slot<1 or slot>invSize then
   println("Slot index out of bounds.")
-  println("Allowed: [1,"..invSize.."]")
+  println("Allowed: [1.0, "..invSize.."]")
   printUsage()
 end
 robot.select(slot)
