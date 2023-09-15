@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.0"
+local version = "v0.1.1"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -775,8 +775,7 @@ local wl = 0
 for yl=maxY-1,2,-3 do
   wll = wl-1
   for xo=30,-30,-3 do
-    xl = xo*wll
-    xll = xl
+    xll = xo*wll
     for zo=31,-25,-7 do
       zl = zo*(wl-1)
       xl, zl = transformXZ(xll, zl, 0)
