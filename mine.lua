@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.1"
+local version = "v0.1.0"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -770,21 +770,24 @@ end
 x,y,z = 0,1,0
 maxY = math.min(maxY, homeY-2)
 maxY = maxY-(maxY%3)
-go(0,2,0)
-scanAndMine()
---go(30,maxY-1,-31,0)
---local xl
---local wl = 0
---for yl=maxY-1,2,-3 do
---  for xo=30,-30,-3 do
---    xl = xo*(wl-1)
---    
---  end
---  if wl==0 then
---    wl = 2
---  else
---    wl = 0
---  end
---end
+local xl, zl, wll
+local wl = 0
+for yl=maxY-1,2,-3 do
+  wll = wl-1
+  for xo=30,-30,-3 do
+    xl = xo*wll
+    for zo=31,-25,-7 do
+      zl = zo*(wl-1)
+      xl, zl = transformXZ(xl, zl, 0)
+      go(xl, yl, zl, wl)
+      scanAndMine()
+    end
+    if wl==0 then
+      wl = 2
+    else
+      wl = 0
+    end
+  end
+end
 go(0,homeY,0,0,true)
 chargeAndDrop()
