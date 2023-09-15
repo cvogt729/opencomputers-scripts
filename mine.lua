@@ -770,15 +770,16 @@ end
 x,y,z = 0,1,0
 maxY = math.min(maxY, homeY-2)
 maxY = maxY-(maxY%3)
-local xl, zl, wll
+local xl, xll, zl, wll
 local wl = 0
 for yl=maxY-1,2,-3 do
   wll = wl-1
   for xo=30,-30,-3 do
     xl = xo*wll
+    xll = xl
     for zo=31,-25,-7 do
       zl = zo*(wl-1)
-      xl, zl = transformXZ(xl, zl, 0)
+      xl, zl = transformXZ(xll, zl, 0)
       go(xl, yl, zl, wl)
       scanAndMine()
     end
