@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.0"
+local version = "v0.1.1"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -741,7 +741,7 @@ local function scanAndMine()
   local ww = w
   local ores = scan()
   local len = #ores
-  for i=0,len,1 do
+  for i=1,len,1 do
     ores[i]._x, ores[i]._z = transformXZ(ores[i]._x, ores[i]._z, ww, w)
     kill(ores[i]._x, ores[i]._y, ores[i]._z)
   end
