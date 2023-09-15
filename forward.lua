@@ -93,4 +93,4 @@ local x = 0
 while x<d and forward() do
   x = x+1
 end
-println("Moved forward "..x.." blocks.")
+println("Moved forward "..x.." block(s).")

@@ -709,11 +709,45 @@ local function scan()
       end
     end
   end
+  raw = nil
+  table.sort(ores, function (a,b)
+    if a._z==b._z then
+      if a._y==b._y then
+        if a._y%2==0 then
+          return a._x<b._x
+        else
+          return a._x>b._x
+        end
+      else
+        if a._z%2==0 then
+          return a._y<b._y
+        else
+          return a._y>b._y
+        end
+      end
+    else
+      return a._z<b._z
+    end
+  end)
   for i=1,j,1 do
-    println("("..ores[i]._x..", "..ores[i]._z..", "..ores[i]._y..")")
+    ores[i]._x = x+ores[i]._x
+    ores[i]._y = y+ores[i]._y
+    ores[i]._z = z+ores[i]._z
+    --println("("..ores[i]._x..", "..ores[i]._z..", "..ores[i]._y..")")
+  end
+  return ores
+end
+local function scanAndMine()
+  local ww = w
+  local ores = scan()
+  local len = #ores
+  for i=0,len,1 do
+    ores[i]._x, ores[i]._z = transformXZ(ores[i]._x, ores[i]._z, ww, w)
+    kill(ores[i]._x, ores[i]._y, ores[i]._z)
   end
 end
 
+-- This is where the primary logic block begins
 orientGeolyzer()
 chargeAndDrop()
 homeY = 1
@@ -736,7 +770,21 @@ end
 x,y,z = 0,1,0
 maxY = math.min(maxY, homeY-2)
 maxY = maxY-(maxY%3)
-
+go(0,2,0)
+scanAndMine()
+--go(30,maxY-1,-31,0)
+--local xl
+--local wl = 0
+--for yl=maxY-1,2,-3 do
+--  for xo=30,-30,-3 do
+--    xl = xo*(wl-1)
+--    
+--  end
+--  if wl==0 then
+--    wl = 2
+--  else
+--    wl = 0
+--  end
+--end
 go(0,homeY,0,0,true)
 chargeAndDrop()
-scan()
