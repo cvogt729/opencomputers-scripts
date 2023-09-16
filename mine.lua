@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.1"
+local version = "v0.1.0"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -26,17 +26,11 @@ local placementBlocks = {
 }
 -- items which may be burned for energy in the generator
 local fuelSources = {
-  "Coal",
-  "Charcoal",
-  "Planks",
-  "Fence"
+  "Coal"
 }
 -- important items which should not be discarded
 local valuables = {
   "Coal",
-  "Charcoal",
-  "Planks",
-  "Fence",
   "Redstone",
   "Quartz",
   "Crystal",
@@ -139,8 +133,8 @@ local function printUsage()
     name = "mine"
   end
   println("Usage:")
-  println(name.." <maxY>")
-  println("maxY: Upper bound for mining depth")
+  println(name.." [maxY]")
+  println("maxY: Optional upper bound for mining depth")
   os.exit()
 end
 local args = {...}
@@ -148,18 +142,22 @@ if #args==1 and (args[1]=="--version" or args[1]=="-v") then
   println(version)
   os.exit()
 end
-if #args~=1 then
-  if #args>0 then
-    println("Incorrect number of arguments.")
+if #args>1 or (#args==1 and (args[1]=="--help" or args[1]=="-h" or args[1]=="help")) then
+  printUsage()
+end
+local maxY
+if #args==1 then
+  maxY = tonumber(args[1])
+  if maxY==nil then
+    println("Failed to convert argument to number.")
+    printUsage()
+  elseif maxY<=0 then
+    println("Please provide a positive maximum bound.")
+    printUsage()
   end
-  printUsage()
+else
+  maxY = -1
 end
-local maxY = tonumber(args[1])
-if maxY==nil then
-  println("Failed to convert argument to number.")
-  printUsage()
-end
-
 
 -- returns the energy level of this robot
 local function getEnergy()
@@ -199,9 +197,11 @@ local function dropValuables(keepFuel)
         if not keepFuel or hasFuel or not fuelSources[key] then
           select(i)
           if not robot.drop() then
-            println("Valuables inventory is full.")
-            robot.turnRight()
-            os.exit()
+            println("Please empty the valuables inventory.")
+            os.sleep(15)
+            while not robot.drop() do
+              os.sleep(10)
+            end
           end
         else
           hasFuel = true
@@ -552,6 +552,7 @@ local function go(xx,yy,zz,ww,ignoreCheck)
     end
   end
 end
+local killCount = 0
 local function kill(xx,yy,zz)
   if needsHome() then
     local ww = w
@@ -580,7 +581,9 @@ local function kill(xx,yy,zz)
           forward()
           zd = zd-1
         end
-        robot.swing()
+        if robot.swing() then
+          killCount = killCount+1
+        end
       end
     elseif zd>=0 then
       while zd>0 do
@@ -598,7 +601,9 @@ local function kill(xx,yy,zz)
         forward()
         xd = xd-1
       end
-      robot.swing()
+      if robot.swing() then
+        killCount = killCount+1
+      end
     else
       local flag = false
       local xd = xx-x
@@ -622,7 +627,9 @@ local function kill(xx,yy,zz)
         forward()
         zd = zd+1
       end
-      robot.swing()
+      if robot.swing() then
+        killCount = killCount+1
+      end
     end
   else
     goXZ(xx-x,zz-z)
@@ -632,13 +639,17 @@ local function kill(xx,yy,zz)
         up()
         yd = yd-1
       end
-      robot.swingUp()
+      if robot.swingUp() then
+        killCount = killCount+1
+      end
     else
       while yd<-1 do
         down()
         yd = yd+1
       end
-      robot.swingDown()
+      if robot.swingDown() then
+        killCount = killCount+1
+      end
     end
   end
 end
@@ -768,7 +779,11 @@ while true do
   end
 end
 x,y,z = 0,1,0
-maxY = math.min(maxY, homeY-2)
+if maxY<0 then
+  maxY = homeY-2
+else
+  maxY = math.min(maxY, homeY-2)
+end
 maxY = maxY-(maxY%3)
 local xl, xll, zl, wll
 local wl = 0
@@ -791,3 +806,4 @@ for yl=maxY-1,2,-3 do
 end
 go(0,homeY,0,0,true)
 chargeAndDrop()
+println("Kill Count = "+killCount)
