@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.1"
+local version = "v0.1.0"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -185,13 +185,54 @@ local function select(slot)
   end
   return true
 end
+local function findFortune()
+  local enchant
+  for i=1,invSize,1 do
+    if robot.count(i)==1 then
+      enchant = inv.getStackInInternalSlot(i).enchantments
+      if enchant~=nil then
+        for j=#enchant,1,-1 do
+          if "Fortune"==enchant[j].label:sub(1,7) then
+            return i
+          end
+        end
+      end
+    end
+  end
+  return -1
+end
+local fortuneSlot = findFortune()
+local hasFortune = fortuneSlot>0
+local fortuneEnabled = false
+if hasFortune then
+  println("Fortune mining tool found!")
+end
+local function tryFortune()
+  if hasFortune and not fortuneEnabled then
+    fortuneSlot = findFortune()
+    if fortuneSlot>0 then
+      select(fortuneSlot)
+      inv.equip()
+      fortuneEnabled = true
+    else
+      hasFortune = false
+    end
+  end
+end
+local function endFortune()
+  if fortuneEnabled then
+    fortuneEnabled = false
+    select(fortuneSlot)
+    inv.equip()
+  end
+end
 -- drops all valuable items in front of the robot
 -- retains at most one slot for fuel when keepFuel is true
 local function dropValuables(keepFuel)
   local key
   local hasFuel = false
   for i=1,invSize,1 do
-    if robot.count(i)>0 then
+    if i~=fortuneSlot and robot.count(i)>0 then
       key = inv.getStackInInternalSlot(i).label:match("%w+$")
       if key and valuables[key] then
         if not keepFuel or hasFuel or not fuelSources[key] then
@@ -216,7 +257,7 @@ local function dropTrash(keepBlock)
   local key
   local hasBlock = false
   for i=1,invSize,1 do
-    if robot.count(i)>0 then
+    if i~=fortuneSlot and robot.count(i)>0 then
       key = inv.getStackInInternalSlot(i).label:match("%w+$")
       if key and not valuables[key] then
         if not keepBlock or hasBlock or not placementBlocks[key] then
@@ -295,47 +336,6 @@ local function removeFuel()
     end
   end
   return false
-end
-local function findFortune()
-  local enchant
-  for i=1,invSize,1 do
-    if robot.count(i)==1 then
-      enchant = inv.getStackInInternalSlot(i).enchantments
-      if enchant~=nil then
-        for j=#enchant,1,-1 do
-          if "Fortune"==enchant[j].label:sub(1,7) then
-            return i
-          end
-        end
-      end
-    end
-  end
-  return -1
-end
-local hasFortune = findFortune()>0
-local fortuneEnabled = false
-local fortuneSlot
-if hasFortune then
-  println("Fortune mining tool found!")
-end
-local function tryFortune()
-  if hasFortune and not fortuneEnabled then
-    fortuneSlot = findFortune()
-    if fortuneSlot>0 then
-      select(fortuneSlot)
-      inv.equip()
-      fortuneEnabled = true
-    else
-      hasFortune = false
-    end
-  end
-end
-local function endFortune()
-  if fortuneEnabled then
-    fortuneEnabled = false
-    select(fortuneSlot)
-    inv.equip()
-  end
 end
 -- positive x axis is to left of robot
 -- positive z axis is to front of robot
