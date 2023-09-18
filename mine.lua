@@ -1,6 +1,6 @@
 
 -- Mining Program
-local version = "v0.1.0"
+local version = "v0.1.1"
 
 -- Requirements:
 --   Upgrade: Geolyzer
@@ -296,6 +296,47 @@ local function removeFuel()
   end
   return false
 end
+local function findFortune()
+  local enchant
+  for i=1,invSize,1 do
+    if robot.count(i)==1 then
+      enchant = inv.getStackInInternalSlot(i).enchantments
+      if enchant~=nil then
+        for j=#enchant,1,-1 do
+          if "Fortune"==enchant[j].label:sub(1,7) then
+            return i
+          end
+        end
+      end
+    end
+  end
+  return -1
+end
+local hasFortune = findFortune()>0
+local fortuneEnabled = false
+local fortuneSlot
+if hasFortune then
+  println("Fortune mining tool found!")
+end
+local function tryFortune()
+  if hasFortune and not fortuneEnabled then
+    fortuneSlot = findFortune()
+    if fortuneSlot>0 then
+      select(fortuneSlot)
+      inv.equip()
+      fortuneEnabled = true
+    else
+      hasFortune = false
+    end
+  end
+end
+local function endFortune()
+  if fortuneEnabled then
+    fortuneEnabled = false
+    select(fortuneSlot)
+    inv.equip()
+  end
+end
 -- positive x axis is to left of robot
 -- positive z axis is to front of robot
 -- positive y axis is above robot
@@ -581,9 +622,11 @@ local function kill(xx,yy,zz)
           forward()
           zd = zd-1
         end
+        tryFortune()
         if robot.swing() then
           killCount = killCount+1
         end
+        endFortune()
       end
     elseif zd>=0 then
       while zd>0 do
@@ -601,9 +644,11 @@ local function kill(xx,yy,zz)
         forward()
         xd = xd-1
       end
+      tryFortune()
       if robot.swing() then
         killCount = killCount+1
       end
+      endFortune()
     else
       local flag = false
       local xd = xx-x
@@ -627,9 +672,11 @@ local function kill(xx,yy,zz)
         forward()
         zd = zd+1
       end
+      tryFortune()
       if robot.swing() then
         killCount = killCount+1
       end
+      endFortune()
     end
   else
     goXZ(xx-x,zz-z)
@@ -639,17 +686,21 @@ local function kill(xx,yy,zz)
         up()
         yd = yd-1
       end
+      tryFortune()
       if robot.swingUp() then
         killCount = killCount+1
       end
+      endFortune()
     else
       while yd<-1 do
         down()
         yd = yd+1
       end
+      tryFortune()
       if robot.swingDown() then
         killCount = killCount+1
       end
+      endFortune()
     end
   end
 end
@@ -806,4 +857,4 @@ for yl=maxY-1,2,-3 do
 end
 go(0,homeY,0,0,true)
 chargeAndDrop()
-println("Kill Count = "+killCount)
+println("Kill Count = "..tostring(killCount))
